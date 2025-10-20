@@ -5,9 +5,33 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-const Color kLuxuryBlue = Color(0xFF001B48);
-const Color kAccentGreen = Color(0xFF00BFA6);
-const Color kGold = Color(0xFFFFD700);
+class AppTheme {
+  static const Color primaryBlue = Color(0xFF4361EE);
+  static const Color secondaryPurple = Color(0xFF7209B7);
+  static const Color accentTeal = Color(0xFF4CC9F0);
+  static const Color successGreen = Color(0xFF06D6A0);
+  static const Color warningAmber = Color(0xFFFFD166);
+  static const Color errorRed = Color(0xFFEF476F);
+  static const Color backgroundWhite = Color(0xFFF8F9FA);
+  static const Color surfaceLight = Color(0xFFFFFFFF);
+  static const Color textPrimary = Color(0xFF212529);
+  static const Color textSecondary = Color(0xFF6C757D);
+  static const Color textDisabled = Color(0xFFADB5BD);
+  static const Color shadowSubtle = Color(0x0D000000);
+  static const Color overlayDark = Color(0x66000000);
+  
+  static const Gradient primaryGradient = LinearGradient(
+    colors: [primaryBlue, secondaryPurple],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  
+  static const Gradient secondaryGradient = LinearGradient(
+    colors: [accentTeal, primaryBlue],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   LatLng _currentLocation = const LatLng(4.9040, -1.7550);
   bool _isLoadingLocation = false;
   bool _isMenuOpen = false;
+  String _locationAddress = "Getting your location...";
 
   final List<Map<String, dynamic>> _riders = [];
   late final StreamSubscription<List<Map<String, dynamic>>> _riderStreamSub;
@@ -46,7 +71,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'priceRange': 'GHC 15-25',
       'minPrice': 15,
       'maxPrice': 25,
-      'color': kLuxuryBlue,
+      'color': AppTheme.primaryBlue,
+      'gradient': LinearGradient(
+        colors: [AppTheme.primaryBlue, Color(0xFF4895EF)],
+      ),
     },
     'tricycle': {
       'name': 'Tricycle',
@@ -54,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'priceRange': 'GHC 20-35',
       'minPrice': 20,
       'maxPrice': 35,
-      'color': Color(0xFF8B4513),
+      'color': AppTheme.secondaryPurple,
+      'gradient': LinearGradient(
+        colors: [AppTheme.secondaryPurple, Color(0xFFB5179E)],
+      ),
     },
     'van': {
       'name': 'Van',
@@ -62,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'priceRange': 'GHC 40-60',
       'minPrice': 40,
       'maxPrice': 60,
-      'color': kAccentGreen,
+      'color': AppTheme.successGreen,
+      'gradient': LinearGradient(
+        colors: [AppTheme.successGreen, Color(0xFF06D6A0)],
+      ),
     },
     'truck': {
       'name': 'Truck',
@@ -70,7 +104,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       'priceRange': 'GHC 80-120',
       'minPrice': 80,
       'maxPrice': 120,
-      'color': Colors.orange,
+      'color': AppTheme.warningAmber,
+      'gradient': LinearGradient(
+        colors: [AppTheme.warningAmber, Color(0xFFFF9E00)],
+      ),
     },
   };
 
@@ -96,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final types = ['motorbike', 'tricycle', 'van', 'truck'];
     final riderNames = [
       'Kwame Mensah',
-      'Ama Boateng',
+      'Ama Boateng', 
       'Kofi Asare',
       'Esi Nyarko',
       'Yaw Owusu',
@@ -133,6 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         'rating': 4.0 + _rnd.nextDouble() * 1.0,
         'price': vehicleData['minPrice'] + _rnd.nextInt(vehicleData['maxPrice'] - vehicleData['minPrice']),
         'color': vehicleData['color'],
+        'gradient': vehicleData['gradient'],
       });
     }
   }
@@ -176,11 +214,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _determinePositionAndMove() async {
-    setState(() => _isLoadingLocation = true);
+    setState(() {
+      _isLoadingLocation = true;
+      _locationAddress = "Detecting your location...";
+    });
+    
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() => _isLoadingLocation = false);
+        setState(() {
+          _isLoadingLocation = false;
+          _locationAddress = "Location services disabled";
+        });
         return;
       }
       
@@ -188,30 +233,68 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => _isLoadingLocation = false);
+          setState(() {
+            _isLoadingLocation = false;
+            _locationAddress = "Location permission denied";
+          });
           return;
         }
       }
       
       if (permission == LocationPermission.deniedForever) {
-        setState(() => _isLoadingLocation = false);
+        setState(() {
+          _isLoadingLocation = false;
+          _locationAddress = "Location permission permanently denied";
+        });
         return;
       }
       
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.best,
+      );
+      
       final clampedLat = pos.latitude.clamp(_takoradiBounds.south, _takoradiBounds.north);
       final clampedLon = pos.longitude.clamp(_takoradiBounds.west, _takoradiBounds.east);
       
       setState(() {
         _currentLocation = LatLng(clampedLat, clampedLon);
         _isLoadingLocation = false;
+        _locationAddress = _getAddressFromCoordinates(clampedLat, clampedLon);
       });
       
       _generateInitialRidersAround(_currentLocation);
       _mapController.move(_currentLocation, 15.0);
-    } catch (_) {
-      setState(() => _isLoadingLocation = false);
+      
+    } catch (e) {
+      setState(() {
+        _isLoadingLocation = false;
+        _locationAddress = "Unable to get location";
+      });
     }
+  }
+
+  String _getAddressFromCoordinates(double lat, double lng) {
+    final landmarks = [
+      {'lat': 4.9015, 'lng': -1.7537, 'name': 'Market Circle'},
+      {'lat': 4.9178, 'lng': -1.7665, 'name': 'Sekondi-Takoradi Stadium'},
+      {'lat': 4.8902, 'lng': -1.7514, 'name': 'Harbor City Mall'},
+      {'lat': 4.9261, 'lng': -1.7732, 'name': 'Takoradi Technical University'},
+      {'lat': 4.9332, 'lng': -1.7821, 'name': 'Effia-Nkwanta Hospital'},
+    ];
+    
+    for (var landmark in landmarks) {
+      final landmarkLat = landmark['lat'] as double;
+      final landmarkLng = landmark['lng'] as double;
+      final distance = _calculateDistance(
+        LatLng(lat, lng), 
+        LatLng(landmarkLat, landmarkLng)
+      );
+      if (distance < 1.0) {
+        return "Near ${landmark['name']}, Takoradi";
+      }
+    }
+    
+    return "Takoradi, Western Region, Ghana";
   }
 
   void _onRiderTap(Map<String, dynamic> rider, TapPosition tapPos) {
@@ -240,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _vehicleMarker(Map<String, dynamic> r) {
     final String type = r['type'] as String;
     final vehicleData = _vehiclePricing[type]!;
-    final Color bg = r['color'] as Color;
+    final Gradient gradient = r['gradient'] as Gradient;
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -249,13 +332,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           width: 56,
           height: 56,
           decoration: BoxDecoration(
-            color: bg,
+            gradient: gradient,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: bg.withOpacity(0.4),
-                blurRadius: 8,
-                spreadRadius: 1,
+                color: AppTheme.primaryBlue.withOpacity(0.4),
+                blurRadius: 12,
+                spreadRadius: 2,
               )
             ],
             border: Border.all(color: Colors.white, width: 3),
@@ -277,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.15),
-                blurRadius: 6,
+                blurRadius: 8,
               )
             ],
           ),
@@ -286,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: kLuxuryBlue,
+              color: AppTheme.primaryBlue,
             ),
           ),
         ),
@@ -335,26 +418,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           markers: [
             Marker(
               point: _currentLocation,
-              width: 52,
-              height: 52,
+              width: 60,
+              height: 60,
               child: Container(
                 decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
                   shape: BoxShape.circle,
-                  color: Colors.white,
-                  border: Border.all(color: kLuxuryBlue, width: 3),
+                  border: Border.all(color: Colors.white, width: 3),
                   boxShadow: [
                     BoxShadow(
-                      color: kLuxuryBlue.withOpacity(0.3),
-                      blurRadius: 10,
-                      spreadRadius: 2,
+                      color: AppTheme.primaryBlue.withOpacity(0.4),
+                      blurRadius: 15,
+                      spreadRadius: 3,
                     )
                   ],
                 ),
                 child: Center(
                   child: Icon(
-                    Icons.person_pin_circle,
-                    color: kLuxuryBlue,
-                    size: 28,
+                    Icons.location_pin,
+                    color: Colors.white,
+                    size: 30,
                   ),
                 ),
               ),
@@ -383,37 +466,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
                 shape: BoxShape.circle,
-                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
+                    color: AppTheme.primaryBlue.withOpacity(0.3),
+                    blurRadius: 10,
                   )
                 ],
               ),
-              child: Icon(Icons.menu, color: kLuxuryBlue),
+              child: Icon(Icons.menu, color: Colors.white),
             ),
           ),
           const Spacer(),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(26),
+              gradient: AppTheme.secondaryGradient,
+              borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 10,
+                  color: AppTheme.secondaryPurple.withOpacity(0.3),
+                  blurRadius: 15,
                 )
               ],
-              gradient: LinearGradient(
-                colors: [kLuxuryBlue, Color(0xFF2A63B8)],
-              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.delivery_dining, color: Colors.white, size: 20),
+                Icon(Icons.delivery_dining, color: Colors.white, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   'SwiftVan',
@@ -421,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ],
@@ -434,25 +514,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildSidebar() {
     return AnimatedPositioned(
-      duration: const Duration(milliseconds: 300),
-      left: _isMenuOpen ? 0 : -MediaQuery.of(context).size.width * 0.75,
+      duration: const Duration(milliseconds: 400),
+      left: _isMenuOpen ? 0 : -MediaQuery.of(context).size.width * 0.8,
       top: 0,
       bottom: 0,
       child: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.75,
+        width: MediaQuery.of(context).size.width * 0.8,
         child: Stack(
           children: [
             Container(
               decoration: BoxDecoration(
-                color: kLuxuryBlue,
+                gradient: LinearGradient(
+                  colors: [AppTheme.primaryBlue, AppTheme.secondaryPurple],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(20),
-                  bottomRight: Radius.circular(20),
+                  topRight: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
+                    color: AppTheme.primaryBlue.withOpacity(0.5),
+                    blurRadius: 30,
                     spreadRadius: 5,
                   )
                 ],
@@ -460,19 +544,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
+                    padding: const EdgeInsets.only(top: 70, bottom: 25, left: 25, right: 25),
                     decoration: BoxDecoration(
-                      color: kLuxuryBlue.withOpacity(0.8),
+                      gradient: LinearGradient(
+                        colors: [AppTheme.primaryBlue.withOpacity(0.9), AppTheme.secondaryPurple.withOpacity(0.8)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(20),
+                        topRight: Radius.circular(30),
                       ),
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: Colors.white.withOpacity(0.2),
-                          child: Icon(Icons.person, color: Colors.white, size: 30),
+                        Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.secondaryGradient,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                          ),
+                          child: Icon(Icons.person, color: Colors.white, size: 32),
                         ),
                         const SizedBox(width: 15),
                         Expanded(
@@ -491,23 +584,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Text(
                                 'kwame.appiah@email.com',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 13,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(Icons.star, color: kGold, size: 16),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '4.8',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star, color: Colors.yellow[700], size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '4.8 • Premium User',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -517,18 +619,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   Expanded(
                     child: ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 25),
                       children: [
-                        _sidebarItem(Icons.delivery_dining, 'My Deliveries'),
-                        _sidebarItem(Icons.payment, 'Payment Methods'),
-                        _sidebarItem(Icons.local_offer, 'Promotions'),
-                        _sidebarItem(Icons.settings, 'Settings'),
-                        const SizedBox(height: 20),
-                        Divider(color: Colors.white.withOpacity(0.3)),
-                        const SizedBox(height: 10),
-                        _sidebarItem(Icons.help, 'Help & Support'),
-                        _sidebarItem(Icons.info, 'About'),
-                        _sidebarItem(Icons.logout, 'Logout', isLogout: true),
+                        _sidebarItem(Icons.delivery_dining, 'My Deliveries', AppTheme.accentTeal),
+                        _sidebarItem(Icons.payment, 'Payment Methods', AppTheme.successGreen),
+                        _sidebarItem(Icons.local_offer, 'Promotions', AppTheme.warningAmber),
+                        _sidebarItem(Icons.settings, 'Settings', AppTheme.textSecondary),
+                        const SizedBox(height: 25),
+                        Divider(color: Colors.white.withOpacity(0.3), height: 1),
+                        const SizedBox(height: 15),
+                        _sidebarItem(Icons.help, 'Help & Support', AppTheme.primaryBlue),
+                        _sidebarItem(Icons.info, 'About', AppTheme.accentTeal),
+                        _sidebarItem(Icons.logout, 'Logout', AppTheme.errorRed, isLogout: true),
                       ],
                     ),
                   ),
@@ -541,21 +643,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _sidebarItem(IconData icon, String title, {bool isLogout = false}) {
-    return ListTile(
-      leading: Icon(icon, color: isLogout ? Colors.red[300] : Colors.white),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isLogout ? Colors.red[300] : Colors.white,
-          fontWeight: FontWeight.w500,
+  Widget _sidebarItem(IconData icon, String title, Color color, {bool isLogout = false}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+      child: ListTile(
+        leading: Container(
+          width: 45,
+          height: 45,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color),
         ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: isLogout ? AppTheme.errorRed : Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          color: isLogout ? AppTheme.errorRed : Colors.white.withOpacity(0.7),
+          size: 16,
+        ),
+        onTap: () {
+          setState(() {
+            _isMenuOpen = false;
+          });
+        },
       ),
-      onTap: () {
-        setState(() {
-          _isMenuOpen = false;
-        });
-      },
     );
   }
 
@@ -568,7 +687,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               });
             },
             child: Container(
-              color: Colors.black.withOpacity(0.5),
+              color: AppTheme.overlayDark,
             ),
           )
         : const SizedBox.shrink();
@@ -584,27 +703,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       left: left,
       top: top,
       child: Material(
-        elevation: 12,
-        borderRadius: BorderRadius.circular(16),
+        elevation: 16,
+        borderRadius: BorderRadius.circular(20),
         child: Container(
-          width: 240,
-          padding: const EdgeInsets.all(16),
+          width: 260,
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade100),
+            gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryBlue.withOpacity(0.3),
+                blurRadius: 20,
+              )
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: (_selectedRider!['color'] as Color).withOpacity(0.1),
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
                     child: Icon(
                       _vehiclePricing[_selectedRider!['type']]!['icon'] as IconData,
-                      color: _selectedRider!['color'] as Color,
+                      color: Colors.white,
                       size: 24,
                     ),
                   ),
@@ -616,6 +744,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         Text(
                           _selectedRider!['name'],
                           style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -623,51 +752,72 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Text(
-                              _selectedRider!['eta'],
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: kLuxuryBlue,
-                                fontWeight: FontWeight.w600,
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _selectedRider!['eta'],
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Icon(Icons.star, color: kGold, size: 14),
+                            Icon(Icons.star, color: Colors.yellow[700], size: 14),
                             Text(
                               ' ${(_selectedRider!['rating'] as double).toStringAsFixed(1)}',
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 18),
-                    onPressed: _closeTooltip,
+                  GestureDetector(
+                    onTap: _closeTooltip,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close, color: Colors.white, size: 18),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 15),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                 decoration: BoxDecoration(
-                  color: kLuxuryBlue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
                       'Estimated Price:',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
                       'GHC ${_selectedRider!['price']}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: kLuxuryBlue,
-                        fontSize: 16,
+                        color: Colors.white,
+                        fontSize: 18,
                       ),
                     ),
                   ],
@@ -683,26 +833,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _vehicleChoiceCard(String type, Map<String, dynamic> vehicleData) {
     final bool active = _selectedVehicleType == type;
     final int availableCount = _riders.where((r) => r['type'] == type).length;
+    final Gradient gradient = vehicleData['gradient'] as Gradient;
     
     return GestureDetector(
       onTap: () => setState(() => _selectedVehicleType = type),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: 130,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        duration: const Duration(milliseconds: 400),
+        width: 140,
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 18),
         decoration: BoxDecoration(
-          color: active ? (vehicleData['color'] as Color).withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          gradient: active ? gradient : LinearGradient(colors: [Colors.white, Colors.white]),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? vehicleData['color'] as Color : Colors.grey.shade300,
-            width: active ? 2 : 1,
+            color: active ? Colors.transparent : Colors.grey.shade300,
+            width: active ? 0 : 1,
           ),
-          boxShadow: [
+          boxShadow: active ? [
             BoxShadow(
-              color: active 
-                  ? (vehicleData['color'] as Color).withOpacity(0.15)
-                  : Colors.black.withOpacity(0.08),
-              blurRadius: 12,
+              color: (vehicleData['color'] as Color).withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            )
+          ] : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 15,
               offset: const Offset(0, 4),
             ),
           ],
@@ -711,13 +866,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: active ? vehicleData['color'] as Color : Colors.grey[100],
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white.withOpacity(0.2) : Colors.grey[100],
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(
                     vehicleData['icon'] as IconData,
                     color: active ? Colors.white : Colors.grey[700],
-                    size: 28,
+                    size: 30,
                   ),
                 ),
                 if (availableCount > 0)
@@ -725,9 +884,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     right: 0,
                     top: 0,
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(6),
                       decoration: const BoxDecoration(
-                        color: Colors.green,
+                        color: AppTheme.successGreen,
                         shape: BoxShape.circle,
                       ),
                       child: Text(
@@ -742,22 +901,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 15),
             Text(
               vehicleData['name'] as String,
               style: TextStyle(
-                color: active ? vehicleData['color'] as Color : Colors.black87,
+                color: active ? Colors.white : AppTheme.textPrimary,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 15,
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               vehicleData['priceRange'] as String,
               style: TextStyle(
-                color: active ? vehicleData['color'] as Color : Colors.grey[600],
-                fontSize: 12,
+                color: active ? Colors.white.withOpacity(0.9) : AppTheme.textSecondary,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -772,57 +931,65 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     return DraggableScrollableSheet(
       controller: _draggableController,
-      initialChildSize: 0.35,
-      minChildSize: 0.2,
-      maxChildSize: 0.8,
+      initialChildSize: 0.38,
+      minChildSize: 0.22,
+      maxChildSize: 0.82,
       snap: true,
-      snapSizes: const [0.2, 0.35, 0.8],
+      snapSizes: const [0.22, 0.38, 0.82],
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            color: AppTheme.backgroundWhite,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 20,
-                spreadRadius: 2,
+                color: Colors.black.withOpacity(0.25),
+                blurRadius: 30,
+                spreadRadius: 5,
               ),
             ],
           ),
           child: SingleChildScrollView(
             controller: scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Container(
-                    width: 60,
-                    height: 5,
+                    width: 70,
+                    height: 6,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(3),
+                      color: Colors.grey[400],
+                      borderRadius: BorderRadius.circular(4),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 const Text(
                   'Request Delivery',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    color: kLuxuryBlue,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 5),
+                Text(
+                  _locationAddress,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 20),
                 _LocationInputRow(
                   label: 'Pickup location',
                   icon: Icons.my_location,
                   value: 'Current location',
                   onCurrentPressed: () => _mapController.move(_currentLocation, 16.0),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 15),
                 _LocationInputRow(
                   label: 'Destination',
                   icon: Icons.location_on,
@@ -858,21 +1025,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Destination: $res'),
-                          backgroundColor: kLuxuryBlue,
+                          backgroundColor: AppTheme.successGreen,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                       );
                     }
                   },
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
                 const Text(
                   'Choose Vehicle Type',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 15),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -880,7 +1052,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       const SizedBox(width: 4),
                       ..._vehiclePricing.entries.map((entry) {
                         return Padding(
-                          padding: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.only(right: 15),
                           child: _vehicleChoiceCard(entry.key, entry.value),
                         );
                       }),
@@ -888,24 +1060,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
                 Text(
                   'Available Vehicles: ${visible.length}',
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 15),
                 SizedBox(
-                  height: 120,
+                  height: 130,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: visible.length,
                     itemBuilder: (context, i) {
                       final r = visible[i];
+                      final Gradient gradient = r['gradient'] as Gradient;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 16),
+                        padding: const EdgeInsets.only(right: 18),
                         child: Column(
                           children: [
                             GestureDetector(
@@ -917,55 +1091,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 });
                               },
                               child: Container(
-                                width: 70,
-                                height: 70,
+                                width: 80,
+                                height: 80,
                                 decoration: BoxDecoration(
-                                  color: (r['color'] as Color).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: r['color'] as Color,
-                                    width: 2,
-                                  ),
+                                  gradient: gradient,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: (r['color'] as Color).withOpacity(0.3),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ],
                                 ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       _vehiclePricing[r['type']]!['icon'] as IconData,
-                                      color: r['color'] as Color,
-                                      size: 30,
+                                      color: Colors.white,
+                                      size: 32,
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 6),
                                     Text(
                                       'GHC ${r['price']}',
-                                      style: TextStyle(
-                                        fontSize: 10,
+                                      style: const TextStyle(
+                                        fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: r['color'] as Color,
+                                        color: Colors.white,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             SizedBox(
-                              width: 80,
+                              width: 90,
                               child: Column(
                                 children: [
                                   Text(
                                     r['name'],
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12,
+                                      fontSize: 13,
+                                      color: AppTheme.textPrimary,
                                     ),
                                     overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
                                   ),
                                   Text(
                                     r['eta'],
                                     style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey,
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondary,
                                     ),
                                   ),
                                 ],
@@ -977,18 +1156,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     },
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
                 const Text(
                   'Package Details',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 15),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 10,
+                  runSpacing: 10,
                   children: [
                     _packageChip('Food', Icons.restaurant),
                     _packageChip('Documents', Icons.description),
@@ -997,71 +1177,100 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _packageChip('Other', Icons.more_horiz),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _descCtrl,
                   maxLines: 3,
                   decoration: InputDecoration(
                     hintText: 'Describe the package (weight, fragility, special instructions...)',
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: AppTheme.backgroundWhite,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                    contentPadding: const EdgeInsets.all(16),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AppTheme.primaryBlue, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.all(18),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 25),
                 Row(
                   children: [
                     Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kLuxuryBlue,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 4,
+                      child: Container(
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: AppTheme.primaryGradient,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryBlue.withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            )
+                          ],
                         ),
-                        onPressed: () {
-                          final vehicle = _selectedVehicleType ?? 'any vehicle';
-                          final vehicleName = _selectedVehicleType != null 
-                              ? _vehiclePricing[_selectedVehicleType]!['name'] 
-                              : 'any vehicle';
-                          final desc = _descCtrl.text.trim();
-                          
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Request sent — searching for nearby $vehicleName. ${desc.isEmpty ? '' : 'Note: $desc'}',
-                              ),
-                              backgroundColor: kAccentGreen,
-                              duration: const Duration(seconds: 4),
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          );
-                          
-                          Future.delayed(const Duration(milliseconds: 500), () {
-                            _draggableController.animateTo(
-                              0.2,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
+                          ),
+                          onPressed: () {
+                            final vehicle = _selectedVehicleType ?? 'any vehicle';
+                            final vehicleName = _selectedVehicleType != null 
+                                ? _vehiclePricing[_selectedVehicleType]!['name'] 
+                                : 'any vehicle';
+                            final desc = _descCtrl.text.trim();
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Request sent — searching for nearby $vehicleName. ${desc.isEmpty ? '' : 'Note: $desc'}',
+                                ),
+                                backgroundColor: AppTheme.successGreen,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                duration: const Duration(seconds: 4),
+                              ),
                             );
-                          });
-                        },
-                        child: const Text(
-                          'Request Rider',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            
+                            Future.delayed(const Duration(milliseconds: 500), () {
+                              _draggableController.animateTo(
+                                0.22,
+                                duration: const Duration(milliseconds: 400),
+                                curve: Curves.easeOut,
+                              );
+                            });
+                          },
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.send, color: Colors.white, size: 22),
+                              SizedBox(width: 10),
+                              Text(
+                                'Request Delivery',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 35),
               ],
             ),
           ),
@@ -1075,18 +1284,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return GestureDetector(
       onTap: () => setState(() => _selectedPackageType = label),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
-          color: active ? kAccentGreen : Colors.white,
+          gradient: active ? AppTheme.primaryGradient : null,
+          color: active ? null : Colors.white,
           border: Border.all(
-            color: active ? kAccentGreen : Colors.grey.shade300,
+            color: active ? Colors.transparent : Colors.grey.shade300,
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: active ? [
             BoxShadow(
-              color: active 
-                  ? kAccentGreen.withOpacity(0.2)
-                  : Colors.black.withOpacity(0.05),
+              color: AppTheme.primaryBlue.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ] : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 6,
             ),
           ],
@@ -1096,16 +1310,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           children: [
             Icon(
               icon,
-              color: active ? Colors.white : kLuxuryBlue,
-              size: 16,
+              color: active ? Colors.white : AppTheme.primaryBlue,
+              size: 18,
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                color: active ? Colors.white : Colors.black87,
+                color: active ? Colors.white : AppTheme.textPrimary,
                 fontWeight: FontWeight.w600,
-                fontSize: 12,
+                fontSize: 14,
               ),
             ),
           ],
@@ -1116,20 +1330,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildBottomNav() {
     return Positioned(
-      left: 20,
-      right: 20,
-      bottom: 20,
+      left: 25,
+      right: 25,
+      bottom: 25,
       child: Container(
-        height: 70,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        height: 75,
+        padding: const EdgeInsets.symmetric(horizontal: 25),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(25),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
-              blurRadius: 15,
-              spreadRadius: 1,
+              blurRadius: 20,
+              spreadRadius: 2,
             ),
           ],
         ),
@@ -1147,36 +1361,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildLocationLoader() {
     return Positioned(
-      top: MediaQuery.of(context).viewPadding.top + 84,
-      left: 20,
+      top: MediaQuery.of(context).viewPadding.top + 90,
+      left: 25,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
-          borderRadius: BorderRadius.circular(16),
+          gradient: AppTheme.primaryGradient,
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-            ),
+              color: AppTheme.primaryBlue.withOpacity(0.3),
+              blurRadius: 15,
+            )
           ],
         ),
         child: Row(
           children: [
             SizedBox(
-              width: 20,
-              height: 20,
+              width: 22,
+              height: 22,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(kLuxuryBlue),
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 15),
             Text(
-              'Getting your location in Takoradi...',
-              style: TextStyle(
+              _locationAddress,
+              style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                color: kLuxuryBlue,
+                color: Colors.white,
               ),
             ),
           ],
@@ -1224,22 +1438,37 @@ class _LocationInputRow extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
+          color: AppTheme.backgroundWhite,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+            )
+          ],
         ),
         child: Row(
           children: [
-            Icon(icon, color: kLuxuryBlue),
-            const SizedBox(width: 12),
+            Container(
+              width: 45,
+              height: 45,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppTheme.primaryBlue, size: 22),
+            ),
+            const SizedBox(width: 15),
             Expanded(
               child: Text(
                 value ?? label,
                 style: TextStyle(
-                  color: value == null ? Colors.grey[600] : Colors.black87,
+                  color: value == null ? AppTheme.textSecondary : AppTheme.textPrimary,
                   fontWeight: FontWeight.w600,
+                  fontSize: 16,
                 ),
               ),
             ),
@@ -1247,17 +1476,17 @@ class _LocationInputRow extends StatelessWidget {
               GestureDetector(
                 onTap: onCurrentPressed,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
                   decoration: BoxDecoration(
-                    color: kLuxuryBlue,
-                    borderRadius: BorderRadius.circular(8),
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'Current',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -1286,24 +1515,25 @@ class _BottomNavItem extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 50,
+          height: 50,
           decoration: BoxDecoration(
-            color: active ? kLuxuryBlue.withOpacity(0.1) : Colors.transparent,
+            gradient: active ? AppTheme.primaryGradient : null,
+            color: active ? null : Colors.transparent,
             shape: BoxShape.circle,
           ),
           child: Icon(
             icon,
-            color: active ? kLuxuryBlue : Colors.grey[600],
-            size: 24,
+            color: active ? Colors.white : AppTheme.textSecondary,
+            size: 26,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
-            color: active ? kLuxuryBlue : Colors.grey[600],
+            fontSize: 13,
+            color: active ? AppTheme.primaryBlue : AppTheme.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),
