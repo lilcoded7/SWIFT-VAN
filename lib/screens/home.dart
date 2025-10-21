@@ -62,6 +62,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     const LatLng(4.94, -1.72),
   );
 
+  late AnimationController _locationAnimationController;
+
   late final DraggableScrollableController _draggableController;
   Map<String, dynamic>? _selectedRider;
   Offset? _tooltipPos;
@@ -148,6 +150,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _draggableController = DraggableScrollableController();
+    _locationAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
     _generateInitialRidersAround(_currentLocation);
     _startSimulatedRiderStream();
     _determinePositionAndMove();
@@ -159,6 +165,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _positionStream?.cancel();
     _draggableController.dispose();
     _descCtrl.dispose();
+    _locationAnimationController.dispose();
     super.dispose();
   }
 
@@ -298,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _positionStream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 10,
+          distanceFilter: 0,
         ),
       ).listen((Position pos) {
         final clampedLat = pos.latitude.clamp(
@@ -315,7 +322,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (_isLoadingLocation) {
           // First time getting location
           _generateInitialRidersAround(newLocation);
-          _mapController.move(newLocation, 15.0);
+          _mapController.move(newLocation, 16.0);
+        } else {
+          // Animate map to new location
+          _mapController.move(newLocation, _mapController.camera.zoom);
         }
 
         setState(() {
@@ -442,7 +452,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          urlTemplate: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
           subdomains: const ['a', 'b', 'c'],
           userAgentPackageName: 'com.swiftvan.app',
         ),
@@ -476,10 +486,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         MarkerLayer(
           markers: [
             Marker(
-              point: _currentLocation,
+              point:
+                  _currentLocation, // This will be the target for the animation
               width: 60,
               height: 60,
-              child: const _UserLocationMarker(),
+              child: TweenAnimationBuilder<LatLng>(
+                tween: LatLngTween(
+                  begin: _currentLocation,
+                  end: _currentLocation,
+                ),
+                duration: const Duration(milliseconds: 500),
+                builder: (context, latLng, child) {
+                  return _UserLocationMarker(key: ValueKey(_currentLocation));
+                },
+              ),
             ),
           ],
         ),
@@ -1654,7 +1674,7 @@ class _PulsingRiderMarkerState extends State<_PulsingRiderMarker>
 }
 
 class _UserLocationMarker extends StatefulWidget {
-  const _UserLocationMarker();
+  const _UserLocationMarker({super.key});
 
   @override
   State<_UserLocationMarker> createState() => _UserLocationMarkerState();
@@ -1704,6 +1724,22 @@ class _UserLocationMarkerState extends State<_UserLocationMarker>
           ),
         ),
       ),
+    );
+  }
+}
+
+class LatLngTween extends Tween<LatLng> {
+  LatLngTween({required LatLng begin, required LatLng end})
+    : super(begin: begin, end: end);
+
+  @override
+  LatLng lerp(double t) {
+    if (begin == null || end == null) {
+      return begin ?? end ?? const LatLng(0, 0);
+    }
+    return LatLng(
+      begin!.latitude + (end!.latitude - begin!.latitude) * t,
+      begin!.longitude + (end!.longitude - begin!.longitude) * t,
     );
   }
 }
