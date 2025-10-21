@@ -1,6 +1,6 @@
 name: swiftvan
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -14,7 +14,8 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^9.0.2
   cupertino_icons: ^1.0.8
-
+  fluttertoast: ^8.2.6
+  sizer: ^2.0.15
 
 dev_dependencies:
   flutter_test:
